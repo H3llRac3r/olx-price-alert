@@ -1,0 +1,43 @@
+name: Price Alert
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # la fiecare 30 de minute
+  workflow_dispatch:          # buton "Run workflow" manual, pt. testare
+
+permissions:
+  contents: write            # necesar ca sa poata salva istoricul/jurnalul inapoi in repo
+
+concurrency:
+  group: price-alert-run
+  cancel-in-progress: false  # daca o rulare intarzie, urmatoarea asteapta, nu porneste peste ea
+
+jobs:
+  ruleaza:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout cod
+        uses: actions/checkout@v4
+
+      - name: Instaleaza Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instaleaza dependente
+        run: pip install -r requirements.txt
+
+      - name: Ruleaza scriptul
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python price_alert.py
+
+      - name: Salveaza istoricul si jurnalul inapoi in repo
+        run: |
+          git config user.name "price-alert-bot"
+          git config user.email "actions@github.com"
+          git add price_alert_istoric.json jurnal_achizitii.csv
+          git diff --staged --quiet || git commit -m "update istoric [skip ci]"
+          git push
